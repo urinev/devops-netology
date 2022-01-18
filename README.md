@@ -1,4 +1,4 @@
- devops-netology
+#devops-netology
 5. v.memory = 1024	v.cpus = 2
 6. config.vm.provider "virtualbox" do |v|
    * v.memory = 2048
