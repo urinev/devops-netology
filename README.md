@@ -1,58 +1,53 @@
-1. CD втроенная команда bash. CD изменяет текущий каталог среды выполнения оболочки.
-2. ```grep <some_string> <some_file> -c``` посчитает количество совпадений в файле
-3. ```vagrant@vagrant:~$ pstree -up```
+1. 
+```chdir("/tmp")```
+2. 
 ```
-systemd(1)─┬─VBoxService(824)─┬─{VBoxService}(825)
-           │                  ├─{VBoxService}(826)
-           │                  ├─{VBoxService}(827)
-           │                  ├─{VBoxService}(828)
-           │                  ├─{VBoxService}(829)
-           │                  ├─{VBoxService}(830)
-           │                  ├─{VBoxService}(831)
-           │                  └─{VBoxService}(832)
-           ├─accounts-daemon(623)─┬─{accounts-daemon}(627)
-           │                      └─{accounts-daemon}(683)
+openat(AT_FDCWD, "/usr/share/misc/magic.mgc", O_RDONLY) = 3
+vagrant@vagrant:~$ file /usr/share/misc/magic.mgc
+/usr/share/misc/magic.mgc: symbolic link to ../../lib/file/magic.mgc
+vagrant@vagrant:`$ file /lib/file/magic.mgc
+/lib/file/magic.mgc: magic binary file for file(1) cmd (version 14) (little endian)
 ```
-4. ```ls 2>/dev/pts1```
+3. 
+```
+vagrant@vagrant:~$ rm /home/vagrant/.file.swp
+vagrant@vagrant:~$ lsof | grep deleted
+vi        2358                        vagrant    4u      REG              253,0    12288    1048595 /home/vagrant/.file.swp (deleted)
+vagrant@vagrant:~$ ls -l /proc/2358/fd | grep "/home/vagrant/.file.swp"
+lrwx------ 1 vagrant vagrant 64 Jan 25 19:01 4 -> /home/vagrant/.file.swp (deleted)
+vagrant@vagrant:~$ truncate -s 0 /proc/2358/fd/4
+```
+4. Зомби процессы ресурсов не занимают, но по прежнему имеют запись в таблице процессов.
 5. 
-```vagrant@vagrant:~$ ls
-file
-vagrant@vagrant:~$ cat file
-test
-vagrant@vagrant:~$ ls
-file
-vagrant@vagrant:~$ cat file
-test
-vagrant@vagrant:~$ cat <file>new
-vagrant@vagrant:~$ ls
-file  new
-vagrant@vagrant:~$ cat new
-test
 ```
-6. Получится: ```echo hello from pts0 to tty1 >/dev/tty1```
-7. ```bash 5>&1``` добавит дескриптор + перенаправит в stdout
-    * ```echo netology > /proc/$$/fd/5``` выведет "netology"` т.к. /proc/$$/fd/5 > /proc/$$/fd/1
-8. ```5>&2 2>&1 1>&5``` (новый дескриптор(5) в stderr, stderr в stdout, stdout в новый дескриптор(5))
-9. ```cat /proc/$$/environ``` отображает переменные окружения. ```env``` ```printenv```
-10. ```/proc/<PID>/cmdline``` файл только для чтения, содержит полный путь до процесса, если "зомби" то 0.
-```/proc/<PID>/exe``` символическая ссылка, фактический путь к выполняемому файлу. cat-посмотреть содержимое. Если выполнить то запустит копию файла.
-11. ```grep sse /proc/cpuinfo```  sse4_2
-12. 
+root@vagrant:~# dpkg -L bpfcc-tools | grep sbin/opensnoop
+/usr/sbin/opensnoop-bpfcc
+root@vagrant:~# /usr/sbin/opensnoop-bpfcc
+PID    COMM               FD ERR PATH
+874    vminfo              6   0 /var/run/utmp
+630    dbus-daemon        -1   2 /usr/local/share/dbus-1/system-services
+630    dbus-daemon        20   0 /usr/share/dbus-1/system-services
+630    dbus-daemon        -1   2 /lib/dbus-1/system-services
+630    dbus-daemon        20   0 /var/lib/snapd/dbus-1/system-services/
 ```
-vagrant@vagrant:~$ ssh -t localhost 'tty'
-vagrant@localhost's password:
-/dev/pts/1
-Connection to localhost closed.
-``` 
-14. 
+6.
 ```
-vagrant@vagrant:~$ sudo sysctl kernel.yama.ptrace_scope=0
-kernel.yama.ptrace_scope = 0
-vagrant@vagrant:~$ ps -a
-    PID TTY          TIME CMD
-   1118 tty1     00:00:00 bash
-   1164 tty1     00:00:00 top
-   1165 pts/0    00:00:00 ps
-vagrant@vagrant:~$ reptyr 1164
+Part of the utsname information is also accessible via /proc/sys/kernel/{ostype, hostname, osrelease, version, domainname}.
 ```
-14. команда ```tee``` запущеная с правами su, одновременно выводит и на экран и в фавйл /root/new_file
+7. && - выполняет следующую команду только после успешного завершения предъидущей  
+; - просто разделяет последовательные команды  
+set -e прерывает выполненение команды с не нулевым статусом  
+&& и set -e прервут выполнение команд если предыдущая завершилась ошибкой
+8. ```set -euxo pipefail```  
+-e прервет выполнение при ошибке команды (кроме последней)  
+-u прервет выполнение если переменная не объявлена  
+-x все выполняемые команды выводятся в терминал  
+-o pipefail При сбое команды в конвейере этот код возврата будет использоваться как код возврата для всего конвейера.
+Интерактивный, расширенный режим "логирования" выполнения сценария.
+9. S*  прерываемое ожидание. Процесс ждет наступления события.  
+I* процесс бездействует.  
+< — процесс с высоким приоритетом;  
+N — процесс с низким приоритетом;  
+l — многопоточный процесс;  
+\+ — фоновый процесс;  
+\+ s — лидер сессии.
