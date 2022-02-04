@@ -1,53 +1,86 @@
-1. 
-```chdir("/tmp")```
-2. 
+1. start/stop/restart работает, после перезагрузки запускается.
 ```
-openat(AT_FDCWD, "/usr/share/misc/magic.mgc", O_RDONLY) = 3
-vagrant@vagrant:~$ file /usr/share/misc/magic.mgc
-/usr/share/misc/magic.mgc: symbolic link to ../../lib/file/magic.mgc
-vagrant@vagrant:`$ file /lib/file/magic.mgc
-/lib/file/magic.mgc: magic binary file for file(1) cmd (version 14) (little endian)
+vagrant@vagrant:~$ sudo systemctl enable node_exporter
+Created symlink /etc/systemd/system/default.target.wants/node_exporter.service → /etc/systemd/system/node_exporter.service.
 ```
-3. 
+```buildoutcfg
+vagrant@vagrant:~$ cat /etc/systemd/system/node_exporter.service
+[Unit]
+Description=node_exporter
+
+[Service]
+ExecStart=/usr/local/bin/node_exporter $MY_OPTYONS
+EnvironmentFile=/etc/default/node_exporter
+
+[Install]
+WantedBy=default.target
 ```
-vagrant@vagrant:~$ rm /home/vagrant/.file.swp
-vagrant@vagrant:~$ lsof | grep deleted
-vi        2358                        vagrant    4u      REG              253,0    12288    1048595 /home/vagrant/.file.swp (deleted)
-vagrant@vagrant:~$ ls -l /proc/2358/fd | grep "/home/vagrant/.file.swp"
-lrwx------ 1 vagrant vagrant 64 Jan 25 19:01 4 -> /home/vagrant/.file.swp (deleted)
-vagrant@vagrant:~$ truncate -s 0 /proc/2358/fd/4
+2. CPU:
 ```
-4. Зомби процессы ресурсов не занимают, но по прежнему имеют запись в таблице процессов.
+node_cpu_seconds_total{cpu="0",mode="idle"} 127918.21
+node_cpu_seconds_total{cpu="0",mode="system"} 81.86
+node_cpu_seconds_total{cpu="0",mode="user"} 16.48
+```
+Mem:
+```
+node_memory_MemAvailable_bytes 1.766096896e+09
+node_memory_MemFree_bytes 1.240457216e+09
+```
+Disk:
+```
+node_disk_io_time_seconds_total{device="dm-0"} 41.484
+node_disk_io_time_seconds_total{device="sda"} 41.9
+node_disk_io_time_weighted_seconds_total{device="dm-0"} 102.62
+node_disk_io_time_weighted_seconds_total{device="sda"} 44.528
+node_disk_read_time_seconds_total{device="dm-0"} 18.712
+node_disk_read_time_seconds_total{device="sda"} 14.428
+node_disk_write_time_seconds_total{device="dm-0"} 83.908
+node_disk_write_time_seconds_total{device="sda"} 60.869
+```
+Net:
+```
+node_network_receive_bytes_total{device="eth0"} 354843
+node_network_speed_bytes{device="eth0"} 1.25e+08
+node_network_transmit_bytes_total{device="eth0"} 334618
+```
+3. Netdata установлен. По ссылке localhost:19999 перешел.
+```
+vagrant@vagrant:~$ sudo lsof -i :19999
+COMMAND PID    USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+netdata 641 netdata    4u  IPv4  24668      0t0  TCP *:19999 (LISTEN)
+netdata 641 netdata   53u  IPv4  31829      0t0  TCP vagrant:19999->_gateway:63474 (ESTABLISHED)
+```
+4. OS осознает чт запущена в vm ```dmesg | grep virt``` или ```grep vm```
 5. 
 ```
-root@vagrant:~# dpkg -L bpfcc-tools | grep sbin/opensnoop
-/usr/sbin/opensnoop-bpfcc
-root@vagrant:~# /usr/sbin/opensnoop-bpfcc
-PID    COMM               FD ERR PATH
-874    vminfo              6   0 /var/run/utmp
-630    dbus-daemon        -1   2 /usr/local/share/dbus-1/system-services
-630    dbus-daemon        20   0 /usr/share/dbus-1/system-services
-630    dbus-daemon        -1   2 /lib/dbus-1/system-services
-630    dbus-daemon        20   0 /var/lib/snapd/dbus-1/system-services/
+vagrant@vagrant:~$ sysctl fs.nr_open
+fs.nr_open = 1048576
 ```
+```
+vagrant@vagrant:~$ ulimit -Sn
+1024
+```
+```
+vagrant@vagrant:~$ ulimit -Hn
+1048576
+```
+Можно увеличить ```sysctl -w fs.nr_open=10000000```
 6.
+```buildoutcfg
+root@vagrant:~# ps -a |grep sleep
+   1768 pts/3    00:00:00 sleep
+root@vagrant:~# nsenter --target 1768 --pid --mount
+root@vagrant:/# ps
+    PID TTY          TIME CMD
+      2 pts/4    00:00:00 bash
+     13 pts/4    00:00:00 ps
 ```
-Part of the utsname information is also accessible via /proc/sys/kernel/{ostype, hostname, osrelease, version, domainname}.
+7. :(){ :|:& };: Создает функцию и запускае её. Функция запускает два своих экземпляра и каждый запускает ещё по два.
+```buildoutcfg
+[ 3093.539011] cgroup: fork rejected by pids controller in /user.slice/user-1000.slice/session-1.scope
+vagrant@vagrant:~$ ulimit -u
+7597
+vagrant@vagrant:~$ ulimit -u 50
+vagrant@vagrant:~$ ulimit -u
+50
 ```
-7. && - выполняет следующую команду только после успешного завершения предъидущей  
-; - просто разделяет последовательные команды  
-set -e прерывает выполненение команды с не нулевым статусом  
-&& и set -e прервут выполнение команд если предыдущая завершилась ошибкой
-8. ```set -euxo pipefail```  
--e прервет выполнение при ошибке команды (кроме последней)  
--u прервет выполнение если переменная не объявлена  
--x все выполняемые команды выводятся в терминал  
--o pipefail При сбое команды в конвейере этот код возврата будет использоваться как код возврата для всего конвейера.
-Интерактивный, расширенный режим "логирования" выполнения сценария.
-9. S*  прерываемое ожидание. Процесс ждет наступления события.  
-I* процесс бездействует.  
-< — процесс с высоким приоритетом;  
-N — процесс с низким приоритетом;  
-l — многопоточный процесс;  
-\+ — фоновый процесс;  
-\+ s — лидер сессии.
