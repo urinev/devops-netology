@@ -1,86 +1,218 @@
-1. start/stop/restart работает, после перезагрузки запускается.
+1. 
+2. 
+3. Сделайте vagrant destroy на имеющийся инстанс Ubuntu. Замените содержимое Vagrantfile следующим:
 ```
-vagrant@vagrant:~$ sudo systemctl enable node_exporter
-Created symlink /etc/systemd/system/default.target.wants/node_exporter.service → /etc/systemd/system/node_exporter.service.
+vagrant@vagrant:~$ lsblk
+NAME                      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+loop0                       7:0    0 55.4M  1 loop /snap/core18/2128
+loop1                       7:1    0 70.3M  1 loop /snap/lxd/21029
+loop2                       7:2    0 32.3M  1 loop /snap/snapd/12704
+sda                         8:0    0   64G  0 disk
+├─sda1                      8:1    0    1M  0 part
+├─sda2                      8:2    0    1G  0 part /boot
+└─sda3                      8:3    0   63G  0 part
+  └─ubuntu--vg-ubuntu--lv 253:0    0 31.5G  0 lvm  /
+sdb                         8:16   0  2.5G  0 disk
+sdc                         8:32   0  2.5G  0 disk
 ```
-```buildoutcfg
-vagrant@vagrant:~$ cat /etc/systemd/system/node_exporter.service
-[Unit]
-Description=node_exporter
+4. Используя fdisk, разбейте первый диск на 2 раздела: 2 Гб, оставшееся пространство.
+```
+sdb                         8:16   0  2.5G  0 disk
+├─sdb1                      8:17   0    2G  0 part
+└─sdb2                      8:18   0  511M  0 part
+sdc                         8:32   0  2.5G  0 disk
+```
+5. Используя sfdisk, перенесите данную таблицу разделов на второй диск.
+```
+sdb                         8:16   0  2.5G  0 disk
+├─sdb1                      8:17   0    2G  0 part
+└─sdb2                      8:18   0  511M  0 part
+sdc                         8:32   0  2.5G  0 disk
+├─sdc1                      8:33   0    2G  0 part
+└─sdc2                      8:34   0  511M  0 part
+```
+6. Соберите mdadm RAID1 на паре разделов 2 Гб.
+```
+sdb                         8:16   0  2.5G  0 disk
+├─sdb1                      8:17   0    2G  0 part
+│ └─md0                     9:0    0    2G  0 raid1
+└─sdb2                      8:18   0  511M  0 part
+sdc                         8:32   0  2.5G  0 disk
+├─sdc1                      8:33   0    2G  0 part
+│ └─md0                     9:0    0    2G  0 raid1
+└─sdc2                      8:34   0  511M  0 part
+vagrant@vagrant:~$ cat /proc/mdstat
+Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
+md0 : active raid1 sdc1[1] sdb1[0]
+      2094080 blocks super 1.2 [2/2] [UU]
+```
+7. Соберите mdadm RAID0 на второй паре маленьких разделов.
+```
+sdb                         8:16   0  2.5G  0 disk
+├─sdb1                      8:17   0    2G  0 part
+│ └─md0                     9:0    0    2G  0 raid1
+└─sdb2                      8:18   0  511M  0 part
+  └─md1                     9:1    0 1018M  0 raid0
+sdc                         8:32   0  2.5G  0 disk
+├─sdc1                      8:33   0    2G  0 part
+│ └─md0                     9:0    0    2G  0 raid1
+└─sdc2                      8:34   0  511M  0 part
+  └─md1                     9:1    0 1018M  0 raid0
+vagrant@vagrant:~$ cat /proc/mdstat
+Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
+md1 : active raid0 sdc2[1] sdb2[0]
+      1042432 blocks super 1.2 512k chunks
 
-[Service]
-ExecStart=/usr/local/bin/node_exporter $MY_OPTYONS
-EnvironmentFile=/etc/default/node_exporter
+md0 : active raid1 sdc1[1] sdb1[0]
+      2094080 blocks super 1.2 [2/2] [UU]
+```
+8. Создайте 2 независимых PV на получившихся md-устройствах.
+```
+root@vagrant:~# pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/sda3
+  VG Name               ubuntu-vg
+  PV Size               <63.00 GiB / not usable 0
+  Allocatable           yes
+  PE Size               4.00 MiB
+  Total PE              16127
+  Free PE               8063
+  Allocated PE          8064
+  PV UUID               sDUvKe-EtCc-gKuY-ZXTD-1B1d-eh9Q-XldxLf
 
-[Install]
-WantedBy=default.target
+  "/dev/md0" is a new physical volume of "<2.00 GiB"
+  --- NEW Physical volume ---
+  PV Name               /dev/md0
+  VG Name
+  PV Size               <2.00 GiB
+  Allocatable           NO
+  PE Size               0
+  Total PE              0
+  Free PE               0
+  Allocated PE          0
+  PV UUID               i7SbKy-Dxk2-E0xd-xVLi-mso1-zgom-Xcl5Yp
+
+  "/dev/md1" is a new physical volume of "1018.00 MiB"
+  --- NEW Physical volume ---
+  PV Name               /dev/md1
+  VG Name
+  PV Size               1018.00 MiB
+  Allocatable           NO
+  PE Size               0
+  Total PE              0
+  Free PE               0
+  Allocated PE          0
+  PV UUID               1TdX8V-F5kQ-3Np3-5sr0-ZEAa-i1Im-CwvWnY
 ```
-2. CPU:
+9. Создайте общую volume-group на этих двух PV.
 ```
-node_cpu_seconds_total{cpu="0",mode="idle"} 127918.21
-node_cpu_seconds_total{cpu="0",mode="system"} 81.86
-node_cpu_seconds_total{cpu="0",mode="user"} 16.48
+ --- Volume group ---
+  VG Name               vg01
+  System ID
+  Format                lvm2
+  Metadata Areas        2
+  Metadata Sequence No  1
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                0
+  Open LV               0
+  Max PV                0
+  Cur PV                2
+  Act PV                2
+  VG Size               <2.99 GiB
+  PE Size               4.00 MiB
+  Total PE              765
+  Alloc PE / Size       0 / 0
+  Free  PE / Size       765 / <2.99 GiB
+  VG UUID               fifby8-PXL7-6eaF-dGfN-emCx-cMrZ-L3y0QC
 ```
-Mem:
+10. Создайте LV размером 100 Мб, указав его расположение на PV с RAID0.
+```root@vagrant:~# lvcreate -L 100M vg01 /dev/md1
+  Logical volume "lvol0" created.
+root@vagrant:~# lvs
+  LV        VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  ubuntu-lv ubuntu-vg -wi-ao----  31.50g
+  lvol0     vg01      -wi-a----- 100.00m
+root@vagrant:~# vgs
+  VG        #PV #LV #SN Attr   VSize   VFree
+  ubuntu-vg   1   1   0 wz--n- <63.00g <31.50g
+  vg01        2   1   0 wz--n-  <2.99g   2.89g
 ```
-node_memory_MemAvailable_bytes 1.766096896e+09
-node_memory_MemFree_bytes 1.240457216e+09
+11. Создайте ```mkfs.ext4``` ФС на получившемся LV.
 ```
-Disk:
+root@vagrant:~# mkfs.ext4 /dev/vg01/lvol0
+mke2fs 1.45.5 (07-Jan-2020)
+Creating filesystem with 25600 4k blocks and 25600 inodes
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (1024 blocks): done
+Writing superblocks and filesystem accounting information: done
 ```
-node_disk_io_time_seconds_total{device="dm-0"} 41.484
-node_disk_io_time_seconds_total{device="sda"} 41.9
-node_disk_io_time_weighted_seconds_total{device="dm-0"} 102.62
-node_disk_io_time_weighted_seconds_total{device="sda"} 44.528
-node_disk_read_time_seconds_total{device="dm-0"} 18.712
-node_disk_read_time_seconds_total{device="sda"} 14.428
-node_disk_write_time_seconds_total{device="dm-0"} 83.908
-node_disk_write_time_seconds_total{device="sda"} 60.869
+12. Смонтируйте этот раздел в любую директорию, например, /tmp/new.
+13. Поместите туда тестовый файл, например wget https://mirror.yandex.ru/ubuntu/ls-lR.gz -O /tmp/new/test.gz.
+14. 
 ```
-Net:
+sdb                         8:16   0  2.5G  0 disk
+├─sdb1                      8:17   0    2G  0 part
+│ └─md126                   9:126  0    2G  0 raid1
+└─sdb2                      8:18   0  511M  0 part
+  └─md127                   9:127  0 1018M  0 raid0
+    └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
+sdc                         8:32   0  2.5G  0 disk
+├─sdc1                      8:33   0    2G  0 part
+│ └─md126                   9:126  0    2G  0 raid1
+└─sdc2                      8:34   0  511M  0 part
+  └─md127                   9:127  0 1018M  0 raid0
+    └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
 ```
-node_network_receive_bytes_total{device="eth0"} 354843
-node_network_speed_bytes{device="eth0"} 1.25e+08
-node_network_transmit_bytes_total{device="eth0"} 334618
+15. OK
+16. 
 ```
-3. Netdata установлен. По ссылке localhost:19999 перешел.
+root@vagrant:~# pvmove /dev/md127
+  /dev/md127: Moved: 60.00%
+  /dev/md127: Moved: 100.00%
+root@vagrant:~# lsblk
+NAME                      MAJ:MIN RM  SIZE RO TYPE  MOUNTPOINT
+loop0                       7:0    0 55.4M  1 loop  /snap/core18/2128
+loop1                       7:1    0 55.5M  1 loop  /snap/core18/2284
+loop2                       7:2    0 61.9M  1 loop  /snap/core20/1328
+loop3                       7:3    0 70.3M  1 loop  /snap/lxd/21029
+loop4                       7:4    0 67.2M  1 loop  /snap/lxd/21835
+loop5                       7:5    0 32.3M  1 loop  /snap/snapd/12704
+loop6                       7:6    0 43.4M  1 loop  /snap/snapd/14549
+sda                         8:0    0   64G  0 disk
+├─sda1                      8:1    0    1M  0 part
+├─sda2                      8:2    0    1G  0 part  /boot
+└─sda3                      8:3    0   63G  0 part
+  └─ubuntu--vg-ubuntu--lv 253:0    0 31.5G  0 lvm   /
+sdb                         8:16   0  2.5G  0 disk
+├─sdb1                      8:17   0    2G  0 part
+│ └─md126                   9:126  0    2G  0 raid1
+│   └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
+└─sdb2                      8:18   0  511M  0 part
+  └─md127                   9:127  0 1018M  0 raid0
+sdc                         8:32   0  2.5G  0 disk
+├─sdc1                      8:33   0    2G  0 part
+│ └─md126                   9:126  0    2G  0 raid1
+│   └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
+└─sdc2                      8:34   0  511M  0 part
+  └─md127                   9:127  0 1018M  0 raid0
 ```
-vagrant@vagrant:~$ sudo lsof -i :19999
-COMMAND PID    USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
-netdata 641 netdata    4u  IPv4  24668      0t0  TCP *:19999 (LISTEN)
-netdata 641 netdata   53u  IPv4  31829      0t0  TCP vagrant:19999->_gateway:63474 (ESTABLISHED)
+17. Сделайте --fail на устройство в вашем RAID1 md.
+18. Подтвердите выводом dmesg, что RAID1 работает в деградированном состоянии.
 ```
-4. OS осознает чт запущена в vm ```dmesg | grep virt``` или ```grep vm```
-5. 
-```
-vagrant@vagrant:~$ sysctl fs.nr_open
-fs.nr_open = 1048576
+[ 2057.956236] md/raid1:md126: Disk failure on sdc1, disabling device.
+               md/raid1:md126: Operation continuing on 1 devices.
 ```
 ```
-vagrant@vagrant:~$ ulimit -Sn
-1024
+root@vagrant:~# cat /proc/mdstat
+Personalities : [raid0] [raid1] [linear] [multipath] [raid6] [raid5] [raid4] [raid10]
+md126 : active raid1 sdb1[0] sdc1[1](F)
+      2094080 blocks super 1.2 [2/1] [U_]
+
+md127 : active raid0 sdb2[0] sdc2[1]
+      1042432 blocks super 1.2 512k chunks
 ```
-```
-vagrant@vagrant:~$ ulimit -Hn
-1048576
-```
-Можно увеличить ```sysctl -w fs.nr_open=10000000```
-6.
-```buildoutcfg
-root@vagrant:~# ps -a |grep sleep
-   1768 pts/3    00:00:00 sleep
-root@vagrant:~# nsenter --target 1768 --pid --mount
-root@vagrant:/# ps
-    PID TTY          TIME CMD
-      2 pts/4    00:00:00 bash
-     13 pts/4    00:00:00 ps
-```
-7. :(){ :|:& };: Создает функцию и запускае её. Функция запускает два своих экземпляра и каждый запускает ещё по два.
-```buildoutcfg
-[ 3093.539011] cgroup: fork rejected by pids controller in /user.slice/user-1000.slice/session-1.scope
-vagrant@vagrant:~$ ulimit -u
-7597
-vagrant@vagrant:~$ ulimit -u 50
-vagrant@vagrant:~$ ulimit -u
-50
-```
+19. Тест ОК
