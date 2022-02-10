@@ -1,5 +1,5 @@
 1. 
-2. 
+2. права доступа и владелец одинаковы на всех hardlink т.к. указывают на одну inodes
 3. Сделайте vagrant destroy на имеющийся инстанс Ubuntu. Замените содержимое Vagrantfile следующим:
 ```
 vagrant@vagrant:~$ lsblk
