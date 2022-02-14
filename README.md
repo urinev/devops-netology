@@ -1,218 +1,120 @@
 1. 
-2. права доступа и владелец одинаковы на всех hardlink т.к. указывают на одну inodes
-3. Сделайте vagrant destroy на имеющийся инстанс Ubuntu. Замените содержимое Vagrantfile следующим:
-```
-vagrant@vagrant:~$ lsblk
-NAME                      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
-loop0                       7:0    0 55.4M  1 loop /snap/core18/2128
-loop1                       7:1    0 70.3M  1 loop /snap/lxd/21029
-loop2                       7:2    0 32.3M  1 loop /snap/snapd/12704
-sda                         8:0    0   64G  0 disk
-├─sda1                      8:1    0    1M  0 part
-├─sda2                      8:2    0    1G  0 part /boot
-└─sda3                      8:3    0   63G  0 part
-  └─ubuntu--vg-ubuntu--lv 253:0    0 31.5G  0 lvm  /
-sdb                         8:16   0  2.5G  0 disk
-sdc                         8:32   0  2.5G  0 disk
-```
-4. Используя fdisk, разбейте первый диск на 2 раздела: 2 Гб, оставшееся пространство.
-```
-sdb                         8:16   0  2.5G  0 disk
-├─sdb1                      8:17   0    2G  0 part
-└─sdb2                      8:18   0  511M  0 part
-sdc                         8:32   0  2.5G  0 disk
-```
-5. Используя sfdisk, перенесите данную таблицу разделов на второй диск.
-```
-sdb                         8:16   0  2.5G  0 disk
-├─sdb1                      8:17   0    2G  0 part
-└─sdb2                      8:18   0  511M  0 part
-sdc                         8:32   0  2.5G  0 disk
-├─sdc1                      8:33   0    2G  0 part
-└─sdc2                      8:34   0  511M  0 part
-```
-6. Соберите mdadm RAID1 на паре разделов 2 Гб.
-```
-sdb                         8:16   0  2.5G  0 disk
-├─sdb1                      8:17   0    2G  0 part
-│ └─md0                     9:0    0    2G  0 raid1
-└─sdb2                      8:18   0  511M  0 part
-sdc                         8:32   0  2.5G  0 disk
-├─sdc1                      8:33   0    2G  0 part
-│ └─md0                     9:0    0    2G  0 raid1
-└─sdc2                      8:34   0  511M  0 part
-vagrant@vagrant:~$ cat /proc/mdstat
-Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
-md0 : active raid1 sdc1[1] sdb1[0]
-      2094080 blocks super 1.2 [2/2] [UU]
-```
-7. Соберите mdadm RAID0 на второй паре маленьких разделов.
-```
-sdb                         8:16   0  2.5G  0 disk
-├─sdb1                      8:17   0    2G  0 part
-│ └─md0                     9:0    0    2G  0 raid1
-└─sdb2                      8:18   0  511M  0 part
-  └─md1                     9:1    0 1018M  0 raid0
-sdc                         8:32   0  2.5G  0 disk
-├─sdc1                      8:33   0    2G  0 part
-│ └─md0                     9:0    0    2G  0 raid1
-└─sdc2                      8:34   0  511M  0 part
-  └─md1                     9:1    0 1018M  0 raid0
-vagrant@vagrant:~$ cat /proc/mdstat
-Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
-md1 : active raid0 sdc2[1] sdb2[0]
-      1042432 blocks super 1.2 512k chunks
+```buildoutcfg
+root@vagrant:~# telnet stackoverflow.com 80
+Trying 151.101.129.69...
+Connected to stackoverflow.com.
+Escape character is '^]'.
+GET /questions HTTP/1.0
+HOST: stackoverflow.com
 
-md0 : active raid1 sdc1[1] sdb1[0]
-      2094080 blocks super 1.2 [2/2] [UU]
-```
-8. Создайте 2 независимых PV на получившихся md-устройствах.
-```
-root@vagrant:~# pvdisplay
-  --- Physical volume ---
-  PV Name               /dev/sda3
-  VG Name               ubuntu-vg
-  PV Size               <63.00 GiB / not usable 0
-  Allocatable           yes
-  PE Size               4.00 MiB
-  Total PE              16127
-  Free PE               8063
-  Allocated PE          8064
-  PV UUID               sDUvKe-EtCc-gKuY-ZXTD-1B1d-eh9Q-XldxLf
+HTTP/1.1 301 Moved Permanently
+cache-control: no-cache, no-store, must-revalidate
+location: https://stackoverflow.com/questions
+x-request-guid: e8170ecc-1bc2-4b44-8226-4c1d60c1723f
+feature-policy: microphone 'none'; speaker 'none'
+content-security-policy: upgrade-insecure-requests; frame-ancestors 'self' https://stackexchange.com
+Accept-Ranges: bytes
+Date: Thu, 10 Feb 2022 13:44:46 GMT
+Via: 1.1 varnish
+Connection: close
+X-Served-By: cache-bma1669-BMA
+X-Cache: MISS
+X-Cache-Hits: 0
+X-Timer: S1644500687.614633,VS0,VE101
+Vary: Fastly-SSL
+X-DNS-Prefetch-Control: off
+Set-Cookie: prov=4349b6ef-033e-c648-f3d1-56d2917a17a4; domain=.stackoverflow.com; expires=Fri, 01-Jan-2055 00:00:00 GMT; path=/; HttpOnly
 
-  "/dev/md0" is a new physical volume of "<2.00 GiB"
-  --- NEW Physical volume ---
-  PV Name               /dev/md0
-  VG Name
-  PV Size               <2.00 GiB
-  Allocatable           NO
-  PE Size               0
-  Total PE              0
-  Free PE               0
-  Allocated PE          0
-  PV UUID               i7SbKy-Dxk2-E0xd-xVLi-mso1-zgom-Xcl5Yp
+Connection closed by foreign host.
+```
+2. 
+```buildoutcfg
+HTTP/1.1 307 Internal Redirect
+Location: https://stackoverflow.com/
+Non-Authoritative-Reason: HSTS
+```
+3. 79.120.12.68
+4. Net By Net Holding LLC AS12714
+5. 
+```buildoutcfg
+2  212.1.254.230 [AS12714]  37.032 ms  4.997 ms  37.002 ms
+ 3  212.1.251.214 [AS12714]  5.461 ms  6.884 ms  4.962 ms
+ 4  212.1.251.0 [AS12714]  4.026 ms 212.1.251.113 [AS12714]  3.999 ms 212.1.239.145 [AS12714]  6.098 ms
+ 5  72.14.215.172 [AS15169]  5.054 ms  5.039 ms  5.039 ms
+ 6  * * *
+ 7  108.170.250.33 [AS15169]  5.620 ms 72.14.239.130 [AS15169]  4.491 ms 172.253.69.166 [AS15169]  5.346 ms
+ 8  108.170.250.34 [AS15169]  5.575 ms 108.170.250.130 [AS15169]  6.188 ms 108.170.250.113 [AS15169]  4.543 ms
+ 9  172.253.66.116 [AS15169]  21.465 ms * *
+10  172.253.66.110 [AS15169]  17.479 ms 74.125.253.109 [AS15169]  18.921 ms 72.14.238.168 [AS15169]  21.908 ms
+11  216.239.49.107 [AS15169]  19.228 ms 172.253.51.223 [AS15169]  20.736 ms 172.253.64.57 [AS15169]  23.860 ms
+12  * * *
+13  * * *
+14  * * *
+15  * * *
+16  * * *
+17  * * *
+18  * * *
+19  * * *
+20  * * *
+21  8.8.8.8 [AS15169]  20.901 ms  19.332 ms  21.639 ms
+```
+6. 
+```buildoutcfg
+AS15169  216.239.57.222                                                   0.0%    83   22.0  21.9  21.4  27.6   0.8
+AS15169  172.253.64.53                                                    0.0%    83   20.8  21.2  20.8  25.3   0.6
+```
+7. 
+```buildoutcfg
+;; AUTHORITY SECTION:
+.                       91056   IN      NS      l.root-servers.net.
+.                       91056   IN      NS      c.root-servers.net.
+.                       91056   IN      NS      d.root-servers.net.
+.                       91056   IN      NS      g.root-servers.net.
+.                       91056   IN      NS      m.root-servers.net.
+.                       91056   IN      NS      b.root-servers.net.
+.                       91056   IN      NS      k.root-servers.net.
+.                       91056   IN      NS      h.root-servers.net.
+.                       91056   IN      NS      e.root-servers.net.
+.                       91056   IN      NS      i.root-servers.net.
+.                       91056   IN      NS      a.root-servers.net.
+.                       91056   IN      NS      f.root-servers.net.
+.                       91056   IN      NS      j.root-servers.net.
 
-  "/dev/md1" is a new physical volume of "1018.00 MiB"
-  --- NEW Physical volume ---
-  PV Name               /dev/md1
-  VG Name
-  PV Size               1018.00 MiB
-  Allocatable           NO
-  PE Size               0
-  Total PE              0
-  Free PE               0
-  Allocated PE          0
-  PV UUID               1TdX8V-F5kQ-3Np3-5sr0-ZEAa-i1Im-CwvWnY
+;; ADDITIONAL SECTION:
+l.root-servers.net.     297342  IN      A       199.7.83.42
+c.root-servers.net.     297342  IN      A       192.33.4.12
+d.root-servers.net.     297342  IN      A       199.7.91.13
+g.root-servers.net.     297342  IN      A       192.112.36.4
+m.root-servers.net.     297342  IN      A       202.12.27.33
+b.root-servers.net.     297342  IN      A       199.9.14.201
+k.root-servers.net.     297342  IN      A       193.0.14.129
+h.root-servers.net.     297342  IN      A       198.97.190.53
+e.root-servers.net.     297342  IN      A       192.203.230.10
+i.root-servers.net.     297342  IN      A       192.36.148.17
+a.root-servers.net.     297342  IN      A       198.41.0.4
+f.root-servers.net.     297342  IN      A       192.5.5.241
+j.root-servers.net.     297342  IN      A       192.58.128.30
 ```
-9. Создайте общую volume-group на этих двух PV.
-```
- --- Volume group ---
-  VG Name               vg01
-  System ID
-  Format                lvm2
-  Metadata Areas        2
-  Metadata Sequence No  1
-  VG Access             read/write
-  VG Status             resizable
-  MAX LV                0
-  Cur LV                0
-  Open LV               0
-  Max PV                0
-  Cur PV                2
-  Act PV                2
-  VG Size               <2.99 GiB
-  PE Size               4.00 MiB
-  Total PE              765
-  Alloc PE / Size       0 / 0
-  Free  PE / Size       765 / <2.99 GiB
-  VG UUID               fifby8-PXL7-6eaF-dGfN-emCx-cMrZ-L3y0QC
-```
-10. Создайте LV размером 100 Мб, указав его расположение на PV с RAID0.
-```root@vagrant:~# lvcreate -L 100M vg01 /dev/md1
-  Logical volume "lvol0" created.
-root@vagrant:~# lvs
-  LV        VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
-  ubuntu-lv ubuntu-vg -wi-ao----  31.50g
-  lvol0     vg01      -wi-a----- 100.00m
-root@vagrant:~# vgs
-  VG        #PV #LV #SN Attr   VSize   VFree
-  ubuntu-vg   1   1   0 wz--n- <63.00g <31.50g
-  vg01        2   1   0 wz--n-  <2.99g   2.89g
-```
-11. Создайте ```mkfs.ext4``` ФС на получившемся LV.
-```
-root@vagrant:~# mkfs.ext4 /dev/vg01/lvol0
-mke2fs 1.45.5 (07-Jan-2020)
-Creating filesystem with 25600 4k blocks and 25600 inodes
+8. 
+```buildoutcfg
+debian:~$ dig -x 192.58.128.30 @8.8.8.8
 
-Allocating group tables: done
-Writing inode tables: done
-Creating journal (1024 blocks): done
-Writing superblocks and filesystem accounting information: done
-```
-12. Смонтируйте этот раздел в любую директорию, например, /tmp/new.
-13. Поместите туда тестовый файл, например wget https://mirror.yandex.ru/ubuntu/ls-lR.gz -O /tmp/new/test.gz.
-14. 
-```
-sdb                         8:16   0  2.5G  0 disk
-├─sdb1                      8:17   0    2G  0 part
-│ └─md126                   9:126  0    2G  0 raid1
-└─sdb2                      8:18   0  511M  0 part
-  └─md127                   9:127  0 1018M  0 raid0
-    └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
-sdc                         8:32   0  2.5G  0 disk
-├─sdc1                      8:33   0    2G  0 part
-│ └─md126                   9:126  0    2G  0 raid1
-└─sdc2                      8:34   0  511M  0 part
-  └─md127                   9:127  0 1018M  0 raid0
-    └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
-```
-15. OK
-16. 
-```
-root@vagrant:~# pvmove /dev/md127
-  /dev/md127: Moved: 60.00%
-  /dev/md127: Moved: 100.00%
-root@vagrant:~# lsblk
-NAME                      MAJ:MIN RM  SIZE RO TYPE  MOUNTPOINT
-loop0                       7:0    0 55.4M  1 loop  /snap/core18/2128
-loop1                       7:1    0 55.5M  1 loop  /snap/core18/2284
-loop2                       7:2    0 61.9M  1 loop  /snap/core20/1328
-loop3                       7:3    0 70.3M  1 loop  /snap/lxd/21029
-loop4                       7:4    0 67.2M  1 loop  /snap/lxd/21835
-loop5                       7:5    0 32.3M  1 loop  /snap/snapd/12704
-loop6                       7:6    0 43.4M  1 loop  /snap/snapd/14549
-sda                         8:0    0   64G  0 disk
-├─sda1                      8:1    0    1M  0 part
-├─sda2                      8:2    0    1G  0 part  /boot
-└─sda3                      8:3    0   63G  0 part
-  └─ubuntu--vg-ubuntu--lv 253:0    0 31.5G  0 lvm   /
-sdb                         8:16   0  2.5G  0 disk
-├─sdb1                      8:17   0    2G  0 part
-│ └─md126                   9:126  0    2G  0 raid1
-│   └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
-└─sdb2                      8:18   0  511M  0 part
-  └─md127                   9:127  0 1018M  0 raid0
-sdc                         8:32   0  2.5G  0 disk
-├─sdc1                      8:33   0    2G  0 part
-│ └─md126                   9:126  0    2G  0 raid1
-│   └─vg01-lvol0          253:1    0  100M  0 lvm   /tmp/new
-└─sdc2                      8:34   0  511M  0 part
-  └─md127                   9:127  0 1018M  0 raid0
-```
-17. Сделайте --fail на устройство в вашем RAID1 md.
-18. Подтвердите выводом dmesg, что RAID1 работает в деградированном состоянии.
-```
-[ 2057.956236] md/raid1:md126: Disk failure on sdc1, disabling device.
-               md/raid1:md126: Operation continuing on 1 devices.
-```
-```
-root@vagrant:~# cat /proc/mdstat
-Personalities : [raid0] [raid1] [linear] [multipath] [raid6] [raid5] [raid4] [raid10]
-md126 : active raid1 sdb1[0] sdc1[1](F)
-      2094080 blocks super 1.2 [2/1] [U_]
+; <<>> DiG 9.16.22-Debian <<>> -x 192.58.128.30 @8.8.8.8
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 33358
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
-md127 : active raid0 sdb2[0] sdc2[1]
-      1042432 blocks super 1.2 512k chunks
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 512
+;; QUESTION SECTION:
+;30.128.58.192.in-addr.arpa.    IN      PTR
+
+;; ANSWER SECTION:
+30.128.58.192.in-addr.arpa. 21390 IN    PTR     j.root-servers.net.
+
+;; Query time: 16 msec
+;; SERVER: 8.8.8.8#53(8.8.8.8)
+;; WHEN: Mon Feb 14 22:43:24 MSK 2022
+;; MSG SIZE  rcvd: 87
 ```
-19. Тест ОК
