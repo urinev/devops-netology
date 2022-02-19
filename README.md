@@ -1,7 +1,7 @@
 1. 
 ```netsh interface show interface``` ```ipconfig /all``` ```Get-NetIPConfiguration -Detailed -All``` ```Get-NetAdapter```  
-```ipaddr``` ```ip link``` ```ip -s link``` ```cat /proc/net/dev``` ```cat /proc/net/dev``` ```cat /proc/net/dev``` 
-2. Address Resolution Protocol ```ip neigh show``` ```ip neigh add 192.168.0.5 lladdr aa:aa:aa:aa:aa:aa dev enp6s0``` ``` ip neigh del dev enp6s0 192.168.0.5```
+```ipaddr``` ```ip link``` ```ip -s link``` ```cat /proc/net/dev``` ```cat /proc/net/dev``` ```cat /proc/net/dev```   
+2. Address Resolution Protocol ```ip neigh show``` ```ip neigh add 192.168.0.5 lladdr aa:aa:aa:aa:aa:aa dev enp6s0``` ``` ip neigh del dev enp6s0 192.168.0.5```  
 3. IEEE 802.1Q  
 ```buildoutcfg
 auto enp6s0.55
