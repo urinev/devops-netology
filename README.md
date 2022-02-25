@@ -1,82 +1,64 @@
-1. 
+1. ![img_2.png](img_2.png)
+2. ![img_3.png](img_3.png)
+3. nginx
+```server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        root /var/www/html;
+        index index.html index.htm index.nginx-debian.html;
+        server_name 192.168.88.10;
+        return 302 https://$server_name$request_uri;
+}
+server {
+# SSL configuration
+        listen 443 ssl http2 default_server;
+        listen [::]:443 ssl http2 default_server;
+        include snippets/self-signed.conf;
+        #include snippets/ssl-params.conf;
+        root /var/www/html;
+        index index.html index.htm index.nginx-debian.html;
+        server_name 192.168.88.10;
+}
 ```
-route-views>show ip route 79.120.12.68
-Routing entry for 79.120.0.0/17
-  Known via "bgp 6447", distance 20, metric 0
-  Tag 3303, type external
-  Last update from 217.192.89.50 1w3d ago
-  Routing Descriptor Blocks:
-  * 217.192.89.50, from 217.192.89.50, 1w3d ago
-      Route metric is 0, traffic share count is 1
-      AS Hops 2
-      Route tag 3303
-      MPLS label: none
-route-views>show bgp 79.120.12.68
-BGP routing table entry for 79.120.0.0/17, version 305317099
-Paths: (23 available, best #14, table default)
-  Not advertised to any peer
-  Refresh Epoch 1
-  8283 12714
-    94.142.247.3 from 94.142.247.3 (94.142.247.3)
-      Origin IGP, metric 0, localpref 100, valid, external
-      Community: 8283:1 8283:101 12714:62000
-      unknown transitive attribute: flag 0xE0 type 0x20 length 0x18
-        value 0000 205B 0000 0000 0000 0001 0000 205B
-              0000 0005 0000 0001
-      path 7FE11602C360 RPKI State not found
-      rx pathid: 0, tx pathid: 0
-  Refresh Epoch 1
-  1351 6939 12714
-    132.198.255.253 from 132.198.255.253 (132.198.255.253)
-      Origin IGP, localpref 100, valid, external
-      path 7FE08DE5F478 RPKI State not found
-      rx pathid: 0, tx pathid: 0
-  Refresh Epoch 1
-  57866 1299 12714
-    37.139.139.17 from 37.139.139.17 (37.139.139.17)
-      Origin IGP, metric 0, localpref 100, valid, external
-      Community: 1299:30000 57866:100 57866:101 57866:501
-      path 7FE0534C4178 RPKI State not found
-      rx pathid: 0, tx pathid: 0
-  Refresh Epoch 1
-  3333 12714
-    193.0.0.56 from 193.0.0.56 (193.0.0.56)
-```  
-2.
-``` 
-$ip link add dummy0 type dummy
-$ip link set dummy0 up
-$ip address add 10.10.10.10/24 dev dummy0
-3: dummy0: <BROADCAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN group default qlen 1000
-    link/ether de:75:02:b6:86:61 brd ff:ff:ff:ff:ff:ff
-    inet 10.10.10.10/24 scope global dummy0
-       valid_lft forever preferred_lft forever
-    inet6 fe80::dc75:2ff:feb6:8661/64 scope link
-       valid_lft forever preferred_lft forever
-$ ip route
-default via 192.168.88.1 dev enp6s0 onlink
-10.10.0.0/24 dev dummy0 scope link
-10.10.1.0/24 dev dummy0 scope link
-10.10.10.0/24 dev dummy0 proto kernel scope link src 10.10.10.10
-192.168.88.0/24 dev enp6s0 proto kernel scope link src 192.168.88.10
-```  
-3.
+![img_4.png](img_4.png)
+4. ![img_5.png](img_5.png)
+5. 
 ```
-ss -ltpn
-State     Recv-Q    Send-Q       Local Address:Port          Peer Address:Port    Process
-LISTEN    0         128                0.0.0.0:22                 0.0.0.0:*        users:(("sshd",pid=601,fd=3))
-LISTEN    0         20               127.0.0.1:25                 0.0.0.0:*        users:(("exim4",pid=1113,fd=4))
-LISTEN    0         4096             127.0.0.1:8125               0.0.0.0:*        users:(("netdata",pid=552,fd=85))
-LISTEN    0         4096               0.0.0.0:19999              0.0.0.0:*        users:(("netdata",pid=552,fd=4))
-LISTEN    0         128                   [::]:22                    [::]:*        users:(("sshd",pid=601,fd=4))
-LISTEN    0         20                   [::1]:25                    [::]:*        users:(("exim4",pid=1113,fd=5))
-LISTEN    0         4096                 [::1]:8125                  [::]:*        users:(("netdata",pid=552,fd=84))
-```  
-4. 
+vagrant@vagrant:~$ ssh user@79.120.xx.xx
+Linux debian 5.10.0-11-amd64 #1 SMP Debian 5.10.92-1 (2022-01-18) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+You have new mail.
+Last login: Fri Feb 25 11:02:13 2022 from 
+user@debian:~$ exit
 ```
-ss -lupn
-State     Recv-Q    Send-Q        Local Address:Port         Peer Address:Port    Process
-UNCONN    0         0                 127.0.0.1:8125              0.0.0.0:*        users:(("netdata",pid=552,fd=83))
-UNCONN    0         0                     [::1]:8125                 [::]:*        users:(("netdata",pid=552,fd=67))
+6. 
 ```
-5. ![img_1.png](img_1.png)
+vagrant@vagrant:~$ cat .ssh/config
+Host debian
+        HostName 79.120.XX.XX
+        IdentityFile ~/.ssh/id_rsa2
+        User user
+        Port 1922
+        ##StrictHostKeyChecking no
+vagrant@vagrant:~$ ssh debian
+Linux debian 5.10.0-11-amd64 #1 SMP Debian 5.10.92-1 (2022-01-18) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+You have new mail.
+Last login: Fri Feb 25 15:45:48 2022 from
+```
+7. 
+```
+@debian:~$ sudo tcpdump -c 100 -w 001.pcap -i enp6s0
+```
