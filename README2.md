@@ -83,13 +83,18 @@ done
 ```bash
 #!/bin/bash
 IP=(192.168.0.1 173.194.222.113 87.250.250.242)
-x=1
-for g in ${IP[@]}; do
-        timeout 1 bash -c "</dev/tcp/$g/80"
-        if [ $? == 0 ]
-                then echo "$g:80 OK" >> ip.log
-                else echo "$g:80 FAIL" >> error.log | break
-        fi
+x=0
+while [[ "$x" == '0' ]];do
+        for g in ${IP[@]}; do
+                timeout 1 bash -c "</dev/tcp/$g/80"
+                if [ $? == 0 ]
+                        then echo "$g:80 OK" >> ip.log
+                        else echo "$g:80 FAIL" >> error.log
+                             ((x++))
+                             break
+                fi
+        done
+        sleep 1
 done
 ```
 
