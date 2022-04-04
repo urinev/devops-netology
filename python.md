@@ -120,6 +120,8 @@ while 1==1:
 [ERROR]drive.google.com IP mismatch:   >>   108.177.14.194
 [ERROR]mail.google.com IP mismatch:   >>   74.125.131.18
 [ERROR]google.com IP mismatch:   >>   173.194.73.101
+[ERROR]mail.google.com IP mismatch:  74.125.131.18 >>   74.125.131.17
+[ERROR]google.com IP mismatch:  173.194.73.101 >>   10.10.10.10
 ```
 
 ## Дополнительное задание (со звездочкой*) - необязательно к выполнению
